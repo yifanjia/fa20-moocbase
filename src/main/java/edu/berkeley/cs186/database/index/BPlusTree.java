@@ -199,8 +199,7 @@ public class BPlusTree {
         LockUtil.ensureSufficientLockHeld(lockContext, LockType.NL);
 
         // TODO(proj2): Return a BPlusTreeIterator.
-
-        return Collections.emptyIterator();
+        return new BPlusTreeIterator(root.getLeftmostLeaf(), null);
     }
 
     /**
@@ -232,8 +231,7 @@ public class BPlusTree {
         LockUtil.ensureSufficientLockHeld(lockContext, LockType.NL);
 
         // TODO(proj2): Return a BPlusTreeIterator.
-
-        return Collections.emptyIterator();
+        return new BPlusTreeIterator(root.get(key), key);
     }
 
     /**
@@ -257,8 +255,14 @@ public class BPlusTree {
         Optional<Pair<DataBox, Long>> returnValue = root.put(key, rid);
         if (returnValue.isPresent()) {
             // update root case
-            long pageNum = returnValue.get().getSecond();
-            updateRoot(BPlusNode.fromBytes(metadata, bufferManager, lockContext, pageNum));
+            // create a new inner node as the new root
+            List<DataBox> keys = new ArrayList<>();
+            keys.add(returnValue.get().getFirst());
+            List<Long> children = new ArrayList<>();
+            children.add(root.getPage().getPageNum());
+            children.add(returnValue.get().getSecond());
+            BPlusNode newRoot = new InnerNode(metadata, bufferManager, keys, children, lockContext);
+            updateRoot(newRoot);
         }
         return;
     }
@@ -417,19 +421,40 @@ public class BPlusTree {
     // Iterator ////////////////////////////////////////////////////////////////
     private class BPlusTreeIterator implements Iterator<RecordId> {
         // TODO(proj2): Add whatever fields and constructors you want here.
+        private LeafNode currentNode;
+        private Iterator<RecordId> currentIterator;
+        public BPlusTreeIterator(LeafNode node, DataBox key) {
+            // set the current node to be node
+            // and iterate starts from element >= key
+            //  if the key is null; start from header
+            currentNode = node;
+            if (key == null) {
+                currentIterator = currentNode.scanAll();
+            }
+            else {
+                currentIterator = currentNode.scanGreaterEqual(key);
+            }
+        }
 
         @Override
         public boolean hasNext() {
             // TODO(proj2): implement
-
-            return false;
+            return currentIterator.hasNext() ||
+                    (currentNode.getRightSibling().isPresent() && currentNode.getRightSibling().get().scanAll().hasNext());
         }
 
         @Override
         public RecordId next() {
             // TODO(proj2): implement
-
-            throw new NoSuchElementException();
+            if (!hasNext()) {
+                throw new NoSuchElementException();
+            }
+            if (!currentIterator.hasNext()) {
+                // current iterator empty case; get the next one
+                currentNode = currentNode.getRightSibling().get();
+                currentIterator = currentNode.scanAll();
+            }
+            return currentIterator.next();
         }
     }
 }

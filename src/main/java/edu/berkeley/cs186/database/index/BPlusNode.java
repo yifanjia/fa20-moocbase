@@ -1,6 +1,7 @@
 package edu.berkeley.cs186.database.index;
 
 import java.util.Iterator;
+import java.util.List;
 import java.util.Optional;
 
 import edu.berkeley.cs186.database.common.Buffer;
@@ -16,6 +17,21 @@ import edu.berkeley.cs186.database.table.RecordId;
  * information.
  */
 abstract class BPlusNode {
+    // helper methods
+    // find the index child node whose subtree may contain the given key
+    // using a given sorted list of keys
+    public static int calIndex(DataBox key, List<DataBox> keys) {
+        int i = 0;
+        for (DataBox splitter : keys) {
+            if (key.compareTo(splitter) >= 0) {
+                i++;
+            }
+            else {
+                break;
+            }
+        }
+        return i;
+    }
     // Core API ////////////////////////////////////////////////////////////////
     /**
      * n.get(k) returns the leaf node on which k may reside when queried from n.

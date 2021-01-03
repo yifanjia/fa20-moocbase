@@ -10,6 +10,7 @@ import edu.berkeley.cs186.database.databox.DataBox;
 import edu.berkeley.cs186.database.databox.Type;
 import edu.berkeley.cs186.database.memory.BufferManager;
 import edu.berkeley.cs186.database.memory.Page;
+import edu.berkeley.cs186.database.table.Record;
 import edu.berkeley.cs186.database.table.RecordId;
 
 /**
@@ -157,8 +158,34 @@ class LeafNode extends BPlusNode {
     @Override
     public Optional<Pair<DataBox, Long>> put(DataBox key, RecordId rid) {
         // TODO(proj2): implement
-
-        return Optional.empty();
+        if (keys.indexOf(key) >= 0) {
+            // duplicate key case
+            throw new BPlusTreeException("Duplicate key error");
+        }
+        Optional<Pair<DataBox, Long>> result = Optional.empty();
+        int index = BPlusNode.calIndex(key, keys);
+        keys.add(index, key);
+        rids.add(index, rid);
+        int order = metadata.getOrder();
+        if (keys.size() > 2 * order && order > 0) {
+            // overflow case
+            // split keys and rids
+            List<DataBox> leftKeys = new ArrayList<>(keys.subList(0, order));
+            List<RecordId> leftRids = new ArrayList<>(rids.subList(0, order));
+            List<DataBox> rightKeys = new ArrayList<>(keys.subList(order, keys.size()));
+            List<RecordId> rightRids = new ArrayList<>(rids.subList(order, keys.size()));
+            DataBox splitter = keys.get(order);
+            // construct the right new node
+            LeafNode newRightNode = new LeafNode(metadata, bufferManager, rightKeys, rightRids, rightSibling, treeContext);
+            // fix the current keys, rids and rightSibling
+            keys = leftKeys;
+            rids = leftRids;
+            rightSibling = Optional.of(newRightNode.page.getPageNum());
+            // splitter and new page number of right new page
+            result = Optional.of(new Pair<>(splitter, rightSibling.get()));
+        }
+        sync();
+        return result;
     }
 
     // See BPlusNode.bulkLoad.

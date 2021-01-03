@@ -79,17 +79,7 @@ class InnerNode extends BPlusNode {
     @Override
     public LeafNode get(DataBox key) {
         // TODO(proj2): implement
-        int i = 0;
-        for (DataBox splitter : keys) {
-            if (key.compareTo(splitter) >= 0) {
-                i++;
-            }
-            else {
-                break;
-            }
-        }
-        BPlusNode child = BPlusNode.fromBytes(metadata, bufferManager, treeContext, children.get(i));
-        return child.get(key);
+        return BPlusNode.fromBytes(metadata, bufferManager, treeContext, children.get(BPlusNode.calIndex(key, keys))).get(key);
     }
 
     // See BPlusNode.getLeftmostLeaf.
@@ -105,8 +95,38 @@ class InnerNode extends BPlusNode {
     @Override
     public Optional<Pair<DataBox, Long>> put(DataBox key, RecordId rid) {
         // TODO(proj2): implement
-
-        return Optional.empty();
+        int index = BPlusNode.calIndex(key, keys);
+        BPlusNode child = BPlusNode.fromBytes(metadata, bufferManager, treeContext, children.get(index));
+        Optional<Pair<DataBox, Long>> returnValue = child.put(key, rid);
+        Optional<Pair<DataBox, Long>> result = Optional.empty();
+        if (returnValue.isPresent()) {
+            // child overflow case
+            DataBox childSplitter = returnValue.get().getFirst();
+            Long newChildPgn = returnValue.get().getSecond();
+            // insert the new element to the current keys and children
+            keys.add(index, childSplitter);
+            children.add(index + 1, newChildPgn);
+            int order = metadata.getOrder();
+            if (keys.size() > 2 * order && order > 0) {
+                // current node overflow case
+                // split keys and children
+                List<DataBox> leftKeys = new ArrayList<>(keys.subList(0, order));
+                List<DataBox> rightKeys = new ArrayList<>(keys.subList(order + 1, keys.size()));
+                List<Long> leftChildren = new ArrayList<>(children.subList(0, order + 1));
+                List<Long> rightChildren = new ArrayList<>(children.subList(order + 1, children.size()));
+                DataBox splitter = keys.get(order);
+                // construct the right new node
+                InnerNode newRightNode = new InnerNode(metadata, bufferManager, rightKeys,
+                        rightChildren, treeContext);
+                // fix the current keys and children
+                keys = leftKeys;
+                children = leftChildren;
+                // splitter and new page number of right new page
+                result = Optional.of(new Pair<>(splitter, newRightNode.page.getPageNum()));
+            }
+            sync();
+        }
+        return result;
     }
 
     // See BPlusNode.bulkLoad.

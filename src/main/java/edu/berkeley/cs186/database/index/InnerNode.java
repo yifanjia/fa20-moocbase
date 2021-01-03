@@ -79,8 +79,17 @@ class InnerNode extends BPlusNode {
     @Override
     public LeafNode get(DataBox key) {
         // TODO(proj2): implement
-
-        return null;
+        int i = 0;
+        for (DataBox splitter : keys) {
+            if (key.compareTo(splitter) >= 0) {
+                i++;
+            }
+            else {
+                break;
+            }
+        }
+        BPlusNode child = BPlusNode.fromBytes(metadata, bufferManager, treeContext, children.get(i));
+        return child.get(key);
     }
 
     // See BPlusNode.getLeftmostLeaf.

@@ -5,6 +5,7 @@ import java.io.FileWriter;
 import java.io.UncheckedIOException;
 import java.util.*;
 
+import edu.berkeley.cs186.database.DatabaseException;
 import edu.berkeley.cs186.database.TransactionContext;
 import edu.berkeley.cs186.database.common.Pair;
 import edu.berkeley.cs186.database.concurrency.LockContext;
@@ -292,7 +293,24 @@ public class BPlusTree {
         // Note: You should NOT update the root variable directly.
         // Use the provided updateRoot() helper method to change
         // the tree's root if the old root splits.
-
+        // verify that the tree is empty
+        if (scanAll().hasNext()) {
+            throw new DatabaseException("Tree is not empty before bulkloading");
+        }
+        while (data.hasNext()) {
+            Optional<Pair<DataBox, Long>> returnValue = root.bulkLoad(data, fillFactor);
+            if (returnValue.isPresent()) {
+                // update root case
+                // create a new inner node as the new root
+                List<DataBox> keys = new ArrayList<>();
+                keys.add(returnValue.get().getFirst());
+                List<Long> children = new ArrayList<>();
+                children.add(root.getPage().getPageNum());
+                children.add(returnValue.get().getSecond());
+                BPlusNode newRoot = new InnerNode(metadata, bufferManager, keys, children, lockContext);
+                updateRoot(newRoot);
+            }
+        }
         return;
     }
 

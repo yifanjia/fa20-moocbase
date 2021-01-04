@@ -193,7 +193,30 @@ class LeafNode extends BPlusNode {
     public Optional<Pair<DataBox, Long>> bulkLoad(Iterator<Pair<DataBox, RecordId>> data,
             float fillFactor) {
         // TODO(proj2): implement
-
+        // keep insert data into this node
+        // until all data have been inserted or the node is more than fillFactor * (2d) full
+        // return the new splitter and new right node if overflow and empty otherwise
+        int order = metadata.getOrder();
+        while (data.hasNext()) {
+            Pair<DataBox, RecordId> pair = data.next();
+            if (keys.size() + 1 > fillFactor * 2 * metadata.getOrder() && order > 0) {
+                // leaf will be more than fillfactor full case
+                // generate new node to contain the next data and return
+                List<DataBox> rightKeys = new ArrayList<>();
+                List<RecordId> rightRids = new ArrayList<>();
+                rightKeys.add(pair.getFirst());
+                rightRids.add(pair.getSecond());
+                LeafNode newRightNode = new LeafNode(metadata, bufferManager, rightKeys, rightRids, rightSibling, treeContext);
+                // fix the current right sibling
+                rightSibling = Optional.of(newRightNode.page.getPageNum());
+                sync();
+                return Optional.of(new Pair<DataBox, Long>(pair.getFirst(), newRightNode.getPage().getPageNum()));
+            } else {
+                keys.add(pair.getFirst());
+                rids.add(pair.getSecond());
+            }
+        }
+        sync();
         return Optional.empty();
     }
 

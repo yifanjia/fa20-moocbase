@@ -74,6 +74,26 @@ class InnerNode extends BPlusNode {
         page.unpin();
     }
 
+    // helper
+    // split the node into two, left half len=order, right half=order+1
+    private Optional<Pair<DataBox, Long>> split(int order) {
+            // current node overflow case
+            // split keys and children
+            List<DataBox> leftKeys = new ArrayList<>(keys.subList(0, order));
+            List<DataBox> rightKeys = new ArrayList<>(keys.subList(order + 1, keys.size()));
+            List<Long> leftChildren = new ArrayList<>(children.subList(0, order + 1));
+            List<Long> rightChildren = new ArrayList<>(children.subList(order + 1, children.size()));
+            DataBox splitter = keys.get(order);
+            // construct the right new node
+            InnerNode newRightNode = new InnerNode(metadata, bufferManager, rightKeys,
+                    rightChildren, treeContext);
+            // fix the current keys and children
+            keys = leftKeys;
+            children = leftChildren;
+            // return splitter and new page number of right new page
+            return Optional.of(new Pair<>(splitter, newRightNode.page.getPageNum()));
+    }
+
     // Core API ////////////////////////////////////////////////////////////////
     // See BPlusNode.get.
     @Override
@@ -109,20 +129,8 @@ class InnerNode extends BPlusNode {
             int order = metadata.getOrder();
             if (keys.size() > 2 * order && order > 0) {
                 // current node overflow case
-                // split keys and children
-                List<DataBox> leftKeys = new ArrayList<>(keys.subList(0, order));
-                List<DataBox> rightKeys = new ArrayList<>(keys.subList(order + 1, keys.size()));
-                List<Long> leftChildren = new ArrayList<>(children.subList(0, order + 1));
-                List<Long> rightChildren = new ArrayList<>(children.subList(order + 1, children.size()));
-                DataBox splitter = keys.get(order);
-                // construct the right new node
-                InnerNode newRightNode = new InnerNode(metadata, bufferManager, rightKeys,
-                        rightChildren, treeContext);
-                // fix the current keys and children
-                keys = leftKeys;
-                children = leftChildren;
-                // splitter and new page number of right new page
-                result = Optional.of(new Pair<>(splitter, newRightNode.page.getPageNum()));
+                // split into two nodes
+                result = split(order);
             }
             sync();
         }
@@ -134,7 +142,26 @@ class InnerNode extends BPlusNode {
     public Optional<Pair<DataBox, Long>> bulkLoad(Iterator<Pair<DataBox, RecordId>> data,
             float fillFactor) {
         // TODO(proj2): implement
-
+        // keep insert data into the rightest subtree of this node
+        // until all data have been inserted or the node is full
+        // return the new splitter and new right node if overflow and empty otherwise
+        int order = metadata.getOrder();
+        while (data.hasNext()) {
+            BPlusNode rightMostChild = BPlusNode.fromBytes(metadata, bufferManager, treeContext, children.get(children.size() - 1));
+            Optional<Pair<DataBox, Long>> returnValue = rightMostChild.bulkLoad(data, fillFactor);
+            if (returnValue.isPresent()) {
+                // child overflow case
+                keys.add(returnValue.get().getFirst());
+                children.add(returnValue.get().getSecond());
+                if (keys.size() > 2 * order && order > 0) {
+                    // current node overflow case
+                    // split into two nodes
+                    sync();
+                    return split(order);
+                }
+            }
+        }
+        sync();
         return Optional.empty();
     }
 

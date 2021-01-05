@@ -98,6 +98,8 @@ class BNLJOperator extends JoinOperator {
                 // fetch B-2 pages and construct the left record iterator
                 leftRecordIterator = BNLJOperator.this.getBlockIterator(this.getLeftTableName(), leftIterator,
                         numBuffers - 2);
+                // mark its first position
+                leftRecordIterator.markNext();
                 // set the left record to be the first record in the block
                 leftRecord = leftRecordIterator.hasNext() ? leftRecordIterator.next() : null;
             }
@@ -132,6 +134,7 @@ class BNLJOperator extends JoinOperator {
          */
         private void fetchNextRecord() {
             // TODO(proj3_part1): implement
+            nextRecord = null;
             while (!hasNext()) {
                 // loop until get the next record
                 // throw NoSuchElementException when no more pair to inspect
@@ -176,6 +179,8 @@ class BNLJOperator extends JoinOperator {
                             // current left block traversed through case
                             // try to get a new right page
                             fetchNextRightPage();
+                            // reset left block to its start
+                            leftRecordIterator.reset();
                         }
                     }
                 }

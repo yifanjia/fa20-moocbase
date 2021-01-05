@@ -161,15 +161,18 @@ class BNLJOperator extends JoinOperator {
                 }
                 else {
                     // will only have case 3 or 4
-                    // try to get next right page
-                    fetchNextRightPage();
+                    rightRecordIterator = null;
+                    if (rightIterator.hasNext()) {
+                        // try to get next right page
+                        fetchNextRightPage();
+                    }
                     if (rightRecordIterator != null) {
                         // Case 3: Neither the right nor left iterators have values to yield, but there's more right pages
                         // reset left block to its start and fetch the next left record
                         leftRecordIterator.reset();
                         leftRecord = leftRecordIterator.next();
                     }
-                    else {
+                    else if (leftIterator.hasNext()){
                         // Case 4: Neither right nor left iterators have values nor are there more right pages, but there are still left blocks
                         // get the next left block, reset right page iterator to the first right page
                         fetchNextLeftBlock();
@@ -178,6 +181,9 @@ class BNLJOperator extends JoinOperator {
                         if (leftRecordIterator == null || rightRecordIterator == null) {
                             throw new NoSuchElementException("No new record to fetch");
                         }
+                    }
+                    else {
+                        throw new NoSuchElementException("No new record to fetch");
                     }
                 }
             }

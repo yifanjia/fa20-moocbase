@@ -187,56 +187,6 @@ class BNLJOperator extends JoinOperator {
                     }
                 }
             }
-//            while (!hasNext()) {
-//                // loop until get the next record
-//                // throw NoSuchElementException when no more pair to inspect
-//                if (leftRecord == null) {
-//                    // all complete
-//                    throw new NoSuchElementException("No new record to fetch");
-//                }
-//                if (rightRecordIterator != null && rightRecordIterator.hasNext()) {
-//                    // Case 1: The right iterator has a value to yield
-//                    // current right page not empty case
-//                    // get one right record
-//                    Record rightRecord = rightRecordIterator.next();
-//                    // yield the output after comparison
-//                    DataBox leftJoinValue = leftRecord.getValues().get(BNLJOperator.this.getLeftColumnIndex());
-//                    DataBox rightJoinValue = rightRecord.getValues().get(BNLJOperator.this.getRightColumnIndex());
-//                    if (leftJoinValue.equals(rightJoinValue)) {
-//                        nextRecord = joinRecords(leftRecord, rightRecord);
-//                    }
-//                }
-//                else {
-//                    // not able to get right record now
-//                    // do the corresponding fetch or reset
-//                    if (rightRecordIterator == null) {
-//                        // Case 4: Neither right nor left iterators have values nor are there more right pages, but there are still left blocks(maybe)
-//                        // right table all traversed through case
-//                        // get the next left block, reset right and get next right page
-//                        fetchNextLeftBlock();
-//                        rightIterator.reset();
-//                        fetchNextRightPage();
-//                    }
-//                    else {
-//                        // current right page traversed through case
-//                        if (leftRecordIterator != null && leftRecordIterator.hasNext()) {
-//                            // Case 2: The right iterator doesn't have a value to yield but the left iterator does
-//                            // current left block not traversed through case
-//                            // one step in the left block and restart the same right page
-//                            leftRecord = leftRecordIterator.next();
-//                            rightRecordIterator.reset();
-//                        }
-//                        else {
-//                            // Case 3: Neither the right nor left iterators have values to yield, but there's more right pages(maybe)
-//                            // current left block traversed through case
-//                            // try to get a new right page
-//                            fetchNextRightPage();
-//                            // reset left block to its start
-//                            leftRecordIterator.reset();
-//                        }
-//                    }
-//                }
-//            }
         }
 
         /**

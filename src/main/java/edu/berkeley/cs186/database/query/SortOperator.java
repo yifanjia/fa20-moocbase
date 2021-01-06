@@ -2,6 +2,7 @@ package edu.berkeley.cs186.database.query;
 
 import edu.berkeley.cs186.database.TransactionContext;
 import edu.berkeley.cs186.database.DatabaseException;
+import edu.berkeley.cs186.database.common.iterator.ArrayBacktrackingIterator;
 import edu.berkeley.cs186.database.common.iterator.BacktrackingIterator;
 import edu.berkeley.cs186.database.databox.DataBox;
 import edu.berkeley.cs186.database.table.Record;
@@ -72,8 +73,15 @@ public class SortOperator {
      */
     public Run sortRun(Run run) {
         // TODO(proj3_part1): implement
-
-        return null;
+        List<Record> elements = new ArrayList<>();
+        Iterator<Record> iterator = run.iterator();
+        while (iterator.hasNext()) {
+            elements.add(iterator.next());
+        }
+        Collections.sort(elements, comparator);
+        Run sortedRun = createRun();
+        sortedRun.addRecords(elements);
+        return sortedRun;
     }
 
     /**
@@ -86,8 +94,34 @@ public class SortOperator {
      */
     public Run mergeSortedRuns(List<Run> runs) {
         // TODO(proj3_part1): implement
-
-        return null;
+        Run result = createRun();
+        PriorityQueue<Pair<Record, Integer>> minHeap = new PriorityQueue<>(new Comparator<Pair<Record, Integer>>() {
+            public int compare(Pair<Record, Integer> p1, Pair<Record, Integer> p2) {
+                return comparator.compare(p1.getFirst(), p2.getFirst());
+            }
+        });
+        // get all iterators
+        Iterator<Record>[] iterators = (Iterator<Record>[]) new Iterator[runs.size()];
+        int idx = 0;
+        for (Run run : runs) {
+            iterators[idx++] = run.iterator();
+        }
+        // initial insert into heap
+        for (int i = 0; i < iterators.length; i++) {
+            if (iterators[i].hasNext()) {
+                minHeap.offer(new Pair<>(iterators[i].next(), i));
+            }
+        }
+        // loop when the heap is not empty
+        while (!minHeap.isEmpty()) {
+            Pair<Record, Integer> ele = minHeap.poll();
+            result.addRecord(ele.getFirst().getValues());
+            Iterator<Record> iterator = iterators[ele.getSecond()];
+            if (iterator.hasNext()) {
+                minHeap.offer(new Pair<>(iterator.next(), ele.getSecond()));
+            }
+        }
+        return result;
     }
 
     /**
@@ -99,8 +133,17 @@ public class SortOperator {
      */
     public List<Run> mergePass(List<Run> runs) {
         // TODO(proj3_part1): implement
-
-        return Collections.emptyList();
+        List<Run> results = new ArrayList<>();
+        int runBlock = numBuffers - 1;
+        for (int start = 0; start < runs.size(); start += runBlock) {
+            int end = start + runBlock;
+            if (end > runs.size()) {
+                end = runs.size();
+            }
+            Run result = mergeSortedRuns(runs.subList(start, end));
+            results.add(result);
+        }
+        return results;
     }
 
     /**
@@ -110,8 +153,18 @@ public class SortOperator {
      */
     public String sort() {
         // TODO(proj3_part1): implement
-
-        return this.tableName; // TODO(proj3_part1): replace this!
+        // get the initial runs
+        List<Run> runs = new ArrayList<>();
+        BacktrackingIterator<Page> pageIterator = transaction.getPageIterator(tableName);
+        while (pageIterator.hasNext()) {
+            BacktrackingIterator<Record> recordIterator = transaction.getBlockIterator(tableName, pageIterator, numBuffers);
+            runs.add(sortRun(createRunFromIterator(recordIterator)));
+        }
+        // loop until only get one run
+        while (runs.size() > 1) {
+            runs = mergePass(runs);
+        }
+        return runs.get(0).tableName(); // TODO(proj3_part1): replace this!
     }
 
     public Iterator<Record> iterator() {

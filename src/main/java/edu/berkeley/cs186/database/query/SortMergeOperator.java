@@ -55,11 +55,127 @@ class SortMergeOperator extends JoinOperator {
         private Record rightRecord;
         private boolean marked;
 
+        /**
+         * Added by me
+         * Helper method to create a joined record from a record of the left relation
+         * and a record of the right relation.
+         * @param leftRecord Record from the left relation
+         * @param rightRecord Record from the right relation
+         * @return joined record
+         */
+        private Record joinRecords(Record leftRecord, Record rightRecord) {
+            List<DataBox> leftValues = new ArrayList<>(leftRecord.getValues());
+            List<DataBox> rightValues = new ArrayList<>(rightRecord.getValues());
+            leftValues.addAll(rightValues);
+            return new Record(leftValues);
+        }
+
+
+        /**
+         * Added by me
+         * Advances the left record
+         *
+         * The thrown exception means we're done: there is no next record
+         * It causes this.fetchNextRecord (the caller) to hand control to its caller.
+         */
+        private void nextLeftRecord() {
+            if (!leftIterator.hasNext()) { throw new NoSuchElementException("All Done!"); }
+            leftRecord = leftIterator.next();
+        }
+
+        /**
+         * Added by me
+         * Advances the right record
+         *
+         */
+        private void nextRightRecord() {
+            rightRecord = rightIterator.hasNext() ? rightIterator.next() : null;
+        }
+
+        // Added by me
+        // operation to add one mark
+        private void endMarkAndBack() {
+            nextLeftRecord();
+            rightIterator.reset();
+            nextRightRecord();
+            marked = false;
+        }
+
+        /**
+         * Added by me
+         * Pre-fetches what will be the next record, and puts it in this.nextRecord.
+         * Pre-fetching simplifies the logic of this.hasNext() and this.next()
+         */
+        private void fetchNextRecord() {
+            nextRecord = null;
+            while (!hasNext()) {
+                if (leftRecord == null) {
+                    throw new NoSuchElementException("No new record to fetch");
+                }
+                if (rightRecord == null) {
+                    if (marked) {
+                        // marked ending case
+                        endMarkAndBack();
+                    } else {
+                        throw new NoSuchElementException("No new record to fetch");
+                    }
+                }
+                else {
+                    DataBox leftJoinValue = leftRecord.getValues().get(SortMergeOperator.this.getLeftColumnIndex());
+                    DataBox rightJoinValue = rightRecord.getValues().get(SortMergeOperator.this.getRightColumnIndex());
+                    if (leftJoinValue.equals(rightJoinValue)) {
+                        // equal case
+                        nextRecord = joinRecords(leftRecord, rightRecord);
+                        if (!marked) {
+                            // mark the right record
+                            rightIterator.markPrev();
+                            marked = true;
+                        }
+                        // one step in right will happen any way
+                        nextRightRecord();
+                    }
+                    else {
+                        // not equal case
+                        if (marked) {
+                            // marked ending case
+                            endMarkAndBack();
+                        }
+                        else {
+                            // move the smaller one forward
+                            if (leftJoinValue.compareTo(rightJoinValue) <= 0) {
+                                nextLeftRecord();
+                            }
+                            else {
+                                nextRightRecord();
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         private SortMergeIterator() {
             super();
             // TODO(proj3_part1): implement
             // Hint: you may find the helper methods getTransaction() and getRecordIterator(tableName)
             // in JoinOperator useful here.
+            SortOperator sortLeftOperator = new SortOperator(SortMergeOperator.this.getTransaction(), this.getLeftTableName(),
+                    new LeftRecordComparator());
+            SortOperator sortRightOperator = new SortOperator(SortMergeOperator.this.getTransaction(), this.getRightTableName(),
+                    new RightRecordComparator());
+            // get the iterators of sorted left and right tables
+            leftIterator = SortMergeOperator.this.getRecordIterator(sortLeftOperator.sort());
+            rightIterator = SortMergeOperator.this.getRecordIterator(sortRightOperator.sort());
+            this.nextRecord = null;
+            this.leftRecord = leftIterator.hasNext() ? leftIterator.next() : null;
+            this.rightRecord = rightIterator.hasNext() ? rightIterator.next() : null;
+            // initially no right record is marked
+            marked = false;
+            try {
+                fetchNextRecord();
+            } catch (NoSuchElementException e) {
+                this.nextRecord = null;
+            }
         }
 
         /**
@@ -70,8 +186,7 @@ class SortMergeOperator extends JoinOperator {
         @Override
         public boolean hasNext() {
             // TODO(proj3_part1): implement
-
-            return false;
+            return this.nextRecord != null;
         }
 
         /**
@@ -83,8 +198,17 @@ class SortMergeOperator extends JoinOperator {
         @Override
         public Record next() {
             // TODO(proj3_part1): implement
+            if (!this.hasNext()) {
+                throw new NoSuchElementException();
+            }
 
-            throw new NoSuchElementException();
+            Record nextRecord = this.nextRecord;
+            try {
+                this.fetchNextRecord();
+            } catch (NoSuchElementException e) {
+                this.nextRecord = null;
+            }
+            return nextRecord;
         }
 
         @Override

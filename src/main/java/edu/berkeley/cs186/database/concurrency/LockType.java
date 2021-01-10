@@ -19,6 +19,20 @@ public enum LockType {
             throw new NullPointerException("null lock type");
         }
         // TODO(proj4_part1): implement
+        switch (a) {
+            case NL:
+                return true;
+            case IS:
+                return b != X;
+            case IX:
+                return b == NL || b == IS || b == IX;
+            case S:
+                return b == NL || b == IS || b == S;
+            case SIX:
+                return b == NL || b == IS;
+            case X:
+                return b == NL;
+        }
 
         return false;
     }
@@ -51,6 +65,24 @@ public enum LockType {
             throw new NullPointerException("null lock type");
         }
         // TODO(proj4_part1): implement
+        if (childLockType == NL) {
+            // NL child will always be ok
+            return true;
+        }
+        switch (parentLockType) {
+            case NL:
+                return false;
+            case S:
+                return childLockType == S || childLockType == IS;
+            case X:
+                return true;
+            case IS:
+                return childLockType == S || childLockType == IS;
+            case IX:
+                return true;
+            case SIX:
+                return childLockType != S && childLockType != IS && childLockType != SIX;
+        }
 
         return false;
     }
@@ -66,7 +98,20 @@ public enum LockType {
             throw new NullPointerException("null lock type");
         }
         // TODO(proj4_part1): implement
-
+        switch (required) {
+            case NL:
+                return true;
+            case S:
+                return substitute == S || substitute == X || substitute == SIX;
+            case X:
+                return substitute == X;
+            case IS:
+                return substitute != NL;
+            case IX:
+                return substitute == IX || substitute == SIX || substitute == X;
+            case SIX:
+                return substitute == SIX || substitute == X;
+        }
         return false;
     }
 
